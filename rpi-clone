@@ -361,7 +361,7 @@ print_partitions()
 	if ((alt_root_part_num > 0))
 	then
 		echo $"
-** Assuming destination root partition for the clone is $dst_part_base$root_part_num
+** Assuming destination root partition for the clone is `basename $(get_dst_dev $dst_part_base $root_part_num)`
    The root FS mount is not from booted $src_disk.  It is ${src_root_dev#/dev/}"
 
 	fi
@@ -383,9 +383,9 @@ print_sync_actions()
 		if ((p == root_part_num && alt_root_part_num > 0))
 		then
 			part=${src_root_dev#/dev/}
-			flow="$part to $dst_part_base$p"
+			flow="$part to `basename $(get_dst_dev $dst_part_base $p)`"
 		else
-			flow="to $dst_part_base$p"
+			flow="to `basename $(get_dst_dev $dst_part_base $p)`"
 		fi
 		if ((src_sync_part[p]))
 		then
@@ -420,9 +420,9 @@ print_image_actions()
 		if ((p == root_part_num && alt_root_part_num > 0))
 		then
 			part=${src_root_dev#/dev/}
-			flow="$part to $dst_part_base$p"
+			flow="$part to `basename $(get_dst_dev $dst_part_base $p)`"
 		else
-			flow="to $dst_part_base$p"
+			flow="to `basename $(get_dst_dev $dst_part_base $p)`"
 		fi
 
 		action=""
@@ -583,6 +583,17 @@ get_src_disk()
 	printf -v "${3}" "%s" "$num"
 	}
 
+get_dst_dev()
+	{
+	local dst_dev_out="/dev/${dst_part_base}${p}"
+	local dst_part_base=$1
+	local part=$2
+	if [[ ${dst_part_base} == *"loop"* ]]
+	then
+		dst_dev_out=/dev/${dst_part_base}p${part}
+	fi
+	echo $dst_dev_out
+	}
 
 # ==== source (booted) disk info and default mount list
 #
@@ -1096,7 +1107,7 @@ fi
 dst_disk_size=$(echo "$dst_partition_table" \
 				| grep "^/dev/$dst_disk" | cut -d ":" -f 2 | tr -d 's')
 dst_root_dev=/dev/${dst_part_base}${root_part_num}
-
+dst_root_dev=$(get_dst_dev ${dst_part_base} ${root_part_num})
 dst_mount_table=$(findmnt -o source,target -n -l \
 				| grep "^/dev/$dst_disk" | tr -s " ")
 
@@ -1120,9 +1131,9 @@ do
 	fi
 	dst_exists[p]=1
 
-	part="${dst_part_base}${p}"
-	dst_partition[p]="$part"
-	dst_device[p]="/dev/$part"
+	dst_dev="$(get_dst_dev ${dst_part_base} ${p})"
+	dst_partition[p]="`basename ${dst_dev}`"
+	dst_device[p]="${dst_dev}"
 
 	dst_start_sector[p]=$(echo "$line" | cut -d ":" -f 2 | tr -d 's')
 	dst_size_sectors[p]=$(echo "$line" | cut -d ":" -f 4 | tr -d 's')
@@ -1485,7 +1496,7 @@ Use -U for unattended even if initializing.
 		then
 			continue
 		fi
-		dst_dev=/dev/${dst_part_base}${p}
+		dst_dev=$(get_dst_dev ${dst_part_base} ${p})
 		fs_type=${src_fs_type[$p]}
 		if    ((p == ext_part_num)) \
 		   || [ "$fs_type" == "--" ]
@@ -1665,7 +1676,7 @@ do
 			qprintf "Syncing unmounted partitions:\n"
 		fi
 		sync_msg_done=1
-		dst_dev=/dev/${dst_part_base}${p}
+		dst_dev=$(get_dst_dev ${dst_part_base} ${p})
 		fs_type=${src_fs_type[$p]}
 		ext_label $p $fs_type "" label
 		if [ "$label" != "" ]
@@ -1711,7 +1722,7 @@ do
 			mkdir -p $dst_dir
 		fi
 
-		dst_dev=/dev/${dst_part_base}${p}
+		dst_dev=$(get_dst_dev ${dst_part_base} ${p})
 		fs_type=${src_fs_type[$p]}
 		ext_label $p $fs_type "" label
 		if [ "$label" != "" ]
